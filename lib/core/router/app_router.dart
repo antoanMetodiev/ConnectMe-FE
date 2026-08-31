@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/profile_setup_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
+import '../../features/contacts/presentation/search_users_screen.dart';
 import '../../features/dev/component_gallery_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -26,6 +27,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const ProfileSetupScreen(),
     ),
     GoRoute(path: '/home', builder: (context, state) => const HomeShell()),
+    GoRoute(
+      path: '/contacts/search',
+      builder: (context, state) => const SearchUsersScreen(),
+    ),
     GoRoute(
       path: '/dev/components',
       builder: (context, state) => const ComponentGalleryScreen(),

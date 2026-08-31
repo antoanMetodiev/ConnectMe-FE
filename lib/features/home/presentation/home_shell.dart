@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'calls_tab.dart';
 import 'chats_tab.dart';
@@ -41,9 +42,7 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(index: _index, children: _tabs),
       floatingActionButton: _index == 0
           ? FloatingActionButton(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Контакти — скоро.')),
-              ),
+              onPressed: () => context.push('/contacts/search'),
               child: const Icon(Icons.add_comment_outlined),
             )
           : null,

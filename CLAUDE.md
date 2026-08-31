@@ -163,7 +163,21 @@ _(Обновявай тази секция след всяка завършен�
       в `ChatsTab`
 - [ ] Профилна снимка при profile setup (изисква Storage bucket + RLS от потребителя, после
       `image_picker` в кода)
-- [ ] Contacts (extreme минимум: search users + add/remove) — достъпен през FAB-а на Chats
+- [x] Contacts — search + send/accept/decline invite (`lib/features/contacts/`):
+      - **DB схема** — `supabase/migrations/0001_profiles_and_contacts.sql` (пуска се ръчно през
+        Supabase SQL Editor, не автоматично оттук): `public.profiles` (публично търсим mirror на
+        `auth.users`, синхронизиран през trigger при insert/update) + `public.contact_requests`
+        (`requester_id`, `addressee_id`, `status`: pending/accepted/declined, unique двойка,
+        RLS: всеки вижда/пипа само редове където участва).
+      - `SearchUsersScreen` (`/contacts/search`, отваря се от FAB-а на Chats таба) — debounced
+        търсене по име/имейл (`.ilike`, sanitize-нато срещу PostgREST filter-injection чрез
+        премахване на `,()` от заявката), бутон "Добави" / "Поканата е изпратена" / Приеми-Откажи
+        / "Контакт" в зависимост от текущия `ContactStatus`.
+      - `ContactsRepository` interface + `SupabaseContactsRepository` impl, `AsyncNotifier`
+        state management (`lib/features/contacts/application/contacts_controller.dart`).
+      - **Все още не е направено** (по избор на потребителя, следваща стъпка): екран за
+        listing на вече приетите контакти (сега приетите/pending статуси се виждат само докато
+        пак търсиш същото име) — само search + invite flow за момента.
 - [ ] Calls (реална функционалност зад `CallsTab` placeholder-а)
 - [ ] Stories (реална функционалност зад `StoriesTab` placeholder-а)
 - [ ] Location sharing
