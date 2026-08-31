@@ -42,5 +42,30 @@
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
   <script src="flutter_bootstrap.js" async></script>
+
+  <!--
+    Dev-only auto-reload: polls main.dart.js for a new build (by
+    Last-Modified) and reloads the page when one lands, so a rebuild shows up
+    on every open tab/phone without a manual refresh. Safe to leave in — it's
+    a couple of HEAD requests a second, nothing else.
+  -->
+  <script>
+    (function () {
+      var lastSeen = null;
+      setInterval(function () {
+        fetch('main.dart.js', { method: 'HEAD', cache: 'no-store' })
+          .then(function (res) {
+            var stamp = res.headers.get('last-modified') || res.headers.get('etag');
+            if (!stamp) return;
+            if (lastSeen === null) {
+              lastSeen = stamp;
+            } else if (stamp !== lastSeen) {
+              location.reload();
+            }
+          })
+          .catch(function () {});
+      }, 1500);
+    })();
+  </script>
 </body>
 </html>

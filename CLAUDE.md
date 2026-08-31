@@ -41,17 +41,30 @@ Backend-ът е изцяло **Supabase**:
   support)
 - **API** — Supabase auto REST/PostgREST + Postgres RPC функции, secure-нато с Row Level Security
 
-Все още не свързваме нищо реално — виж "Current scope" по-долу. Когато дойде моментът,
-`supabase_flutter` пакетът се вкарва зад абстрактния repository слой, без UI да се пипа.
+**Свързан е реален Supabase проект** (URL `https://ezfpwfsxenxceossrtps.supabase.co`).
+Credentials-ите живеят само в `env.json` в root-а на репото — **gitignore-нат, никога не се
+commit-ва**. Шаблонът/полетата са в `env.example.json` (committed). За build/run с реален
+Supabase:
+```
+flutter run --dart-define-from-file=env.json
+flutter build web --dart-define-from-file=env.json
+```
+Без `env.json` (или без стойности в него) приложението продължава да буутва нормално —
+`Env.isSupabaseConfigured` пази `Supabase.initialize` да не гърми, а auth действията показват
+приятелска грешка вместо да чупят UI.
+
+Ключът, който Supabase дава, вече се казва **publishable key** (не "anon key" — старото име е
+deprecated в `supabase_flutter`); в кода/env полето е `SUPABASE_PUBLISHABLE_KEY`.
 
 ## Current scope
 
-**Само frontend засега.** Работим с mock/local данни; Supabase интеграцията ще се включи
-по-късно. Затова:
+**Стратегията се смени с решение на потребителя (2026-08-31): вертикални срезове, не
+"целия frontend после backend".** Вървим feature по feature (auth → chat → ...), всеки път с
+реално свързан Supabase зад него, вместо всичко да е mock и да се жичи накрая. Все пак:
 
-- Няма нужда от реални API извиквания в началото — repository/service слоят трябва да е
-  абстрахиран (интерфейси), за да може после лесно да се включи Supabase имплементация зад тях.
-- Приоритет: UI, навигация, state management, дизайн система, компонентна библиотека.
+- Repository слоят си остава абстрактен (`AuthRepository` interface + `SupabaseAuthRepository`
+  имплементация) — не заради "може после да сменим Supabase", а защото е чист/testable dependency
+  boundary.
 - Кодим mobile-first, но responsive (таблет/по-широки екрани не трябва да чупят layout-а).
 
 ## Process (from the brief, §24)
@@ -96,8 +109,31 @@ _(Обновявай тази секция след всяка завършен�
       екран, ще се замени с реална навигация в следващата стъпка)
 - [ ] Още core widgets по нужда (secondary button, inputs извън chat, cards, badges/chips,
       bottom sheets) — добавяме ги когато реален екран поиска, не предварително
+- [x] Live reload за преглед на телефона — `web/index.html` polls `main.dart.js` (Last-Modified)
+      на всеки 1.5s и си прави reload; `dhttpd` (`dart pub global activate dhttpd`) сервира
+      `build/web` постоянно на `0.0.0.0:8090`. Workflow: `flutter build web
+      --dart-define-from-file=env.json` след промяна → телефонът/браузърът се обновяват сами,
+      без рестарт на сървъра.
+- [x] Auth — Login + Sign Up екрани (`lib/features/auth/presentation/`), реално свързани към
+      Supabase Auth (`lib/features/auth/data/supabase_auth_repository.dart`) през Riverpod
+      `AsyncNotifier` (`lib/features/auth/application/auth_controller.dart`). Routes: `/`
+      (login), `/signup`. Успешен login → `/dev/components` (временна "home" дестинация, докато
+      няма реален Home/Chats екран).
+- [~] Google Sign-In (OAuth) — кодът е готов (`AuthRepository.signInWithGoogle`,
+      бутон на login+signup), **но изисква конфигурация извън кода**, която само потребителят
+      може да направи:
+      1. Google Cloud Console → OAuth client (Web application) → Authorized redirect URI:
+         `https://ezfpwfsxenxceossrtps.supabase.co/auth/v1/callback` → копирай Client ID +
+         Client Secret.
+      2. Supabase Dashboard → Authentication → Providers → Google → Enable → постави
+         Client ID + Secret.
+      3. Supabase Dashboard → Authentication → URL Configuration → Redirect URLs → добави
+         текущия dev адрес (в момента `http://192.168.0.101:8090` — LAN IP, ще трябва да се
+         обнови ако се смени/при преминаване към истински домейн).
+      `AuthController` вече слуша `authStateChanges()` (не само еднократен return), точно за да
+      хване сесията след OAuth redirect-а.
 - [ ] Navigation shell
-- [ ] Auth flow screens (splash, onboarding, login, signup, profile setup)
+- [ ] Splash / onboarding / profile setup екрани (останалата част от auth flow-а по брифа)
 - [ ] Home / Chats
 - [ ] Chat screen
 - [ ] Contacts

@@ -104,7 +104,9 @@ coverage/
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 
-# Local env / secrets (Supabase keys land here later — never commit)
+# Local env / secrets (Supabase keys — never commit)
 .env
 .env.*
 !.env.example
+env.json
+!env.example.json
