@@ -1,9 +1,15 @@
 class AuthUser {
-  const AuthUser({required this.id, required this.email, this.displayName});
+  const AuthUser({
+    required this.id,
+    required this.email,
+    this.displayName,
+    this.profileCompleted = false,
+  });
 
   final String id;
   final String email;
   final String? displayName;
+  final bool profileCompleted;
 }
 
 /// User-facing auth error, decoupled from whichever backend raised it.

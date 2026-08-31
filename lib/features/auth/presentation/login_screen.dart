@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_primary_button.dart';
 import '../../../shared/widgets/google_signin_button.dart';
 import '../../../shared/widgets/or_divider.dart';
 import '../application/auth_controller.dart';
+import '../application/post_auth_route.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -42,7 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authControllerProvider, (previous, next) {
       next.whenOrNull(
         data: (user) {
-          if (user != null) context.go('/dev/components');
+          if (user != null) context.go(postAuthRoute(user));
         },
         error: (error, _) {
           ScaffoldMessenger.of(context)

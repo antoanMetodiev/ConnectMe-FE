@@ -116,29 +116,56 @@ _(Обновявай тази секция след всяка завършен�
       без рестарт на сървъра.
 - [x] Auth — Login + Sign Up екрани (`lib/features/auth/presentation/`), реално свързани към
       Supabase Auth (`lib/features/auth/data/supabase_auth_repository.dart`) през Riverpod
-      `AsyncNotifier` (`lib/features/auth/application/auth_controller.dart`). Routes: `/`
-      (login), `/signup`. Успешен login → `/dev/components` (временна "home" дестинация, докато
-      няма реален Home/Chats екран).
-- [~] Google Sign-In (OAuth) — кодът е готов (`AuthRepository.signInWithGoogle`,
-      бутон на login+signup), **но изисква конфигурация извън кода**, която само потребителят
-      може да направи:
-      1. Google Cloud Console → OAuth client (Web application) → Authorized redirect URI:
-         `https://ezfpwfsxenxceossrtps.supabase.co/auth/v1/callback` → копирай Client ID +
-         Client Secret.
-      2. Supabase Dashboard → Authentication → Providers → Google → Enable → постави
-         Client ID + Secret.
-      3. Supabase Dashboard → Authentication → URL Configuration → Redirect URLs → добави
-         текущия dev адрес (в момента `http://192.168.0.101:8090` — LAN IP, ще трябва да се
-         обнови ако се смени/при преминаване към истински домейн).
-      `AuthController` вече слуша `authStateChanges()` (не само еднократен return), точно за да
-      хване сесията след OAuth redirect-а.
-- [ ] Navigation shell
-- [ ] Splash / onboarding / profile setup екрани (останалата част от auth flow-а по брифа)
-- [ ] Home / Chats
-- [ ] Chat screen
-- [ ] Contacts
-- [ ] Calls
-- [ ] Stories
+      `AsyncNotifier` (`lib/features/auth/application/auth_controller.dart`).
+- [x] Google Sign-In (OAuth) — работи (потвърдено на браузър + телефон). Наложи се Site URL в
+      Supabase (default `http://localhost:3000`) да се смени на текущия dev адрес, иначе
+      redirect-ът пада обратно на default-а при мобилен браузър. Ако dev адресът/IP-то се смени
+      занапред, трябва да се обнови и в Supabase (Site URL + Redirect URLs), иначе Google login
+      пак ще чупи само на устройства, различни от това, с което последно е тествано.
+- [x] Splash / Onboarding / Profile setup:
+      - `/` → `SplashScreen` (`lib/features/splash/`) — решава къде да прати потребителя: няма
+        Supabase конфиг → `/login`; вече логнат → `postAuthRoute(user)`; не логнат и не е виждал
+        onboarding-а (`SharedPreferences`, `lib/features/onboarding/data/onboarding_prefs.dart`)
+        → `/onboarding`; иначе → `/login`.
+      - `/onboarding` — 3 текстови слайда (опростена версия, без илюстрации за момента).
+      - `/profile-setup` — само display name за момента (prefilled от Google профила, ако е
+        оттам); профилна снимка е следваща стъпка — изисква Supabase Storage bucket + RLS
+        policy, преди да го кодя (същия тип external setup като Google OAuth).
+      - `postAuthRoute(user)` (`lib/features/auth/application/post_auth_route.dart`) е single
+        source of truth кой logged-in потребител къде да отиде (`profile_completed` флаг в
+        Supabase user metadata) — ползва се от Splash, Login и Sign Up, за да не се разминава
+        логиката.
+      - Успешен login/signup/profile-setup → `/home` (`HomeShell`).
+- [x] Rebrand на primary цвета от teal (`#2E5F6E`/`#5B96A6`) на зелено — light `#2F6D4F`,
+      dark `#6FBF9A` (`lib/core/theme/app_colors.dart`). Решение на потребителя, вдъхновено от
+      WhatsApp; нарочно **различен** зелен от техния `#25D366` и от нашия presence-зелен
+      (`online: #3FA772`/`#45B57F`), за да не се сливат визуално двата сигнала. Останалата част
+      от Harbor палитрата (background/surface/ink/border/типография/shape) е непроменена —
+      само акцентният цвят се смени.
+- [x] Navigation shell + Home — `HomeShell` (`lib/features/home/presentation/home_shell.dart`):
+      Material3 `NavigationBar` с 4 таба — **Чатове** (default), **Истории**, **Обаждания**,
+      **Профил**. Нарочно решение: **Contacts няма собствен таб** — стартира се през FAB-а на
+      Chats таба (както при WhatsApp — контактите са средство да започнеш чат, не отделна
+      дестинация за browse-ване), а Location sharing е контекстуално (от вътре в чат), не
+      top-level. Взето структурно вдъхновение от WhatsApp-ката IA, но не визуален клонинг
+      (брифът изрично забранява "Copycat WhatsApp layouts" — виж §22).
+      - `ChatsTab` — списък разговори през нов `ConversationTile` widget
+        (`lib/shared/widgets/`), **mock данни засега** (масив в `chats_tab.dart`) — предстои да
+        се свърже с реална Supabase таблица за conversations/messages като следваща vertical
+        slice (има си realtime infra нужди: tables, RLS, presence — по-голяма задача, отделена
+        нарочно от rebrand+nav работата в тази стъпка).
+      - `StoriesTab` / `CallsTab` — placeholder-и ("скоро"), предстоят като отделни стъпки.
+      - `ProfileTab` — показва текущия потребител (име/имейл от Supabase) + работещ бутон
+        "Изход" (`AuthController.signOut`).
+- [ ] Chat screen (отваряне на конкретен разговор — засега `ConversationTile.onTap` показва
+      snackbar "скоро")
+- [ ] Реални conversations/messages в Supabase (tables + RLS + Realtime) — замества mock данните
+      в `ChatsTab`
+- [ ] Профилна снимка при profile setup (изисква Storage bucket + RLS от потребителя, после
+      `image_picker` в кода)
+- [ ] Contacts (extreme минимум: search users + add/remove) — достъпен през FAB-а на Chats
+- [ ] Calls (реална функционалност зад `CallsTab` placeholder-а)
+- [ ] Stories (реална функционалност зад `StoriesTab` placeholder-а)
 - [ ] Location sharing
 - [ ] Settings / Privacy
 

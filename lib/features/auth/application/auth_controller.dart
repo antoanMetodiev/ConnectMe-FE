@@ -52,6 +52,14 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     );
   }
 
+  Future<void> completeProfileSetup({required String displayName}) {
+    return _run(
+      () => ref
+          .read(authRepositoryProvider)
+          .completeProfileSetup(displayName: displayName),
+    );
+  }
+
   Future<void> signInWithGoogle() async {
     if (!Env.isSupabaseConfigured) {
       state = AsyncError(
@@ -70,6 +78,12 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     } catch (e, stackTrace) {
       state = AsyncError(e, stackTrace);
     }
+  }
+
+  Future<void> signOut() async {
+    if (!Env.isSupabaseConfigured) return;
+    await ref.read(authRepositoryProvider).signOut();
+    state = const AsyncData(null);
   }
 
   Future<void> _run(Future<AuthUser> Function() action) async {

@@ -30,13 +30,15 @@ class SupabaseAuthRepository implements AuthRepository {
         password: password,
         data: {'display_name': displayName},
       );
-      final user = response.user;
-      if (user == null) {
+      // No session yet means email confirmation is pending — there's no
+      // authenticated user to hand back until they confirm and sign in.
+      if (response.user == null || response.session == null) {
         throw const AuthFailure(
-          'Регистрацията стартира — провери имейла си, за да я потвърдиш.',
+          'Регистрацията стартира — провери имейла си, за да я потвърдиш, '
+          'после влез.',
         );
       }
-      return _toAuthUser(user)!;
+      return _toAuthUser(response.user)!;
     } on supabase.AuthException catch (e) {
       throw AuthFailure(_friendlyMessage(e));
     }
@@ -79,6 +81,24 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthUser> completeProfileSetup({required String displayName}) async {
+    try {
+      final response = await _client.auth.updateUser(
+        supabase.UserAttributes(
+          data: {'display_name': displayName, 'profile_completed': true},
+        ),
+      );
+      final user = response.user;
+      if (user == null) {
+        throw const AuthFailure('Неуспешно запазване. Опитай пак.');
+      }
+      return _toAuthUser(user)!;
+    } on supabase.AuthException catch (e) {
+      throw AuthFailure(_friendlyMessage(e));
+    }
+  }
+
+  @override
   Future<void> signOut() => _client.auth.signOut();
 
   AuthUser? _toAuthUser(supabase.User? user) {
@@ -87,6 +107,7 @@ class SupabaseAuthRepository implements AuthRepository {
       id: user.id,
       email: user.email!,
       displayName: user.userMetadata?['display_name'] as String?,
+      profileCompleted: user.userMetadata?['profile_completed'] == true,
     );
   }
 

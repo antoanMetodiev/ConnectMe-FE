@@ -31,7 +31,7 @@ class AppPalette {
   final Color warning;
 
   static const light = AppPalette(
-    primary: Color(0xFF2E5F6E),
+    primary: Color(0xFF2F6D4F),
     onPrimary: Color(0xFFFFFFFF),
     background: Color(0xFFEFF3F4),
     surface: Color(0xFFFFFFFF),
@@ -45,8 +45,8 @@ class AppPalette {
   );
 
   static const dark = AppPalette(
-    primary: Color(0xFF5B96A6),
-    onPrimary: Color(0xFF0A1417),
+    primary: Color(0xFF6FBF9A),
+    onPrimary: Color(0xFF0B1F17),
     background: Color(0xFF10161A),
     surface: Color(0xFF182228),
     ink: Color(0xFFE7EDEF),

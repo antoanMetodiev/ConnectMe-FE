@@ -21,5 +21,7 @@ abstract class AuthRepository {
   /// not as a return value here.
   Future<void> signInWithGoogle();
 
+  Future<AuthUser> completeProfileSetup({required String displayName});
+
   Future<void> signOut();
 }
