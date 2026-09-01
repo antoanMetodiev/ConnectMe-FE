@@ -8,7 +8,10 @@ class Env {
   static const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
   static const supabasePublishableKey =
       String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
+  static const streamApiKey = String.fromEnvironment('STREAM_API_KEY');
 
   static bool get isSupabaseConfigured =>
       supabaseUrl.isNotEmpty && supabasePublishableKey.isNotEmpty;
+
+  static bool get isStreamConfigured => streamApiKey.isNotEmpty;
 }

@@ -1,8 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_spacing.dart';
+
+/// Caps bubble width in absolute terms, not just proportionally — on a wide
+/// desktop/browser window, 76% of the viewport is still huge, and sent vs.
+/// received bubbles end up crowding the middle of the screen.
+const _maxBubbleWidth = 420.0;
 
 class MessageBubble extends StatelessWidget {
   const MessageBubble({
@@ -31,7 +38,10 @@ class MessageBubble extends StatelessWidget {
       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.76,
+          maxWidth: math.min(
+            MediaQuery.sizeOf(context).width * 0.6,
+            _maxBubbleWidth,
+          ),
         ),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,

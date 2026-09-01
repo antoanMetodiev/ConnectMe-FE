@@ -44,14 +44,16 @@ class AppPalette {
     warning: Color(0xFFB8863A),
   );
 
+  // Neutral near-black, Spotify-style dark surfaces — true grays (no blue
+  // tint) at two elevations: #121212 base, #181818 for raised surfaces.
   static const dark = AppPalette(
     primary: Color(0xFF6FBF9A),
     onPrimary: Color(0xFF0B1F17),
-    background: Color(0xFF10161A),
-    surface: Color(0xFF182228),
-    ink: Color(0xFFE7EDEF),
-    muted: Color(0xFF8CA0A6),
-    border: Color(0xFF263339),
+    background: Color(0xFF121212),
+    surface: Color(0xFF181818),
+    ink: Color(0xFFFFFFFF),
+    muted: Color(0xFFB3B3B3),
+    border: Color(0xFF282828),
     error: Color(0xFFD97468),
     onError: Color(0xFF2B0D09),
     online: Color(0xFF45B57F),

@@ -82,6 +82,103 @@ class SupabaseContactsRepository implements ContactsRepository {
   }
 
   @override
+  Future<List<ContactSearchResult>> incomingRequests() async {
+    final requestRows = await _client
+        .from('contact_requests')
+        .select()
+        .eq('addressee_id', _myId)
+        .eq('status', 'pending');
+
+    if (requestRows.isEmpty) return [];
+
+    final profilesById = await _profilesById(
+      requestRows.map((r) => r['requester_id'] as String).toList(),
+    );
+
+    return requestRows
+        .map((r) {
+          final profile = profilesById[r['requester_id']];
+          if (profile == null) return null;
+          return ContactSearchResult(
+            profile: profile,
+            status: ContactStatus.pendingReceived,
+            requestId: r['id'] as String,
+          );
+        })
+        .whereType<ContactSearchResult>()
+        .toList();
+  }
+
+  @override
+  Future<List<UserProfile>> acceptedContacts() async {
+    final rows = await _client
+        .from('contact_requests')
+        .select()
+        .eq('status', 'accepted')
+        .or('requester_id.eq.$_myId,addressee_id.eq.$_myId');
+
+    if (rows.isEmpty) return [];
+
+    final otherIds = rows
+        .map(
+          (r) => r['requester_id'] == _myId
+              ? r['addressee_id'] as String
+              : r['requester_id'] as String,
+        )
+        .toList();
+
+    final profilesById = await _profilesById(otherIds);
+    final contacts = profilesById.values.toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return contacts;
+  }
+
+  @override
+  Future<List<ContactActivity>> sentRequestActivity() async {
+    final rows = await _client
+        .from('contact_requests')
+        .select()
+        .eq('requester_id', _myId)
+        .inFilter('status', ['accepted', 'declined'])
+        .order('updated_at', ascending: false);
+
+    if (rows.isEmpty) return [];
+
+    final profilesById = await _profilesById(
+      rows.map((r) => r['addressee_id'] as String).toList(),
+    );
+
+    return rows
+        .map((r) {
+          final profile = profilesById[r['addressee_id']];
+          if (profile == null) return null;
+          return ContactActivity(
+            requestId: r['id'] as String,
+            profile: profile,
+            accepted: r['status'] == 'accepted',
+          );
+        })
+        .whereType<ContactActivity>()
+        .toList();
+  }
+
+  Future<Map<String, UserProfile>> _profilesById(List<String> ids) async {
+    if (ids.isEmpty) return {};
+    final rows = await _client
+        .from('profiles')
+        .select()
+        .inFilter('id', ids.toSet().toList());
+    return {
+      for (final row in rows)
+        row['id'] as String: UserProfile(
+          id: row['id'] as String,
+          email: row['email'] as String,
+          displayName: row['display_name'] as String?,
+        ),
+    };
+  }
+
+  @override
   Future<void> sendRequest(String userId) async {
     try {
       await _client.from('contact_requests').insert({

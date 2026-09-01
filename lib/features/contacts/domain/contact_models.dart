@@ -30,6 +30,20 @@ class ContactSearchResult {
   final String? requestId;
 }
 
+/// A request *we* sent that the other side has since accepted or declined —
+/// surfaced as a notification-style activity feed.
+class ContactActivity {
+  const ContactActivity({
+    required this.requestId,
+    required this.profile,
+    required this.accepted,
+  });
+
+  final String requestId;
+  final UserProfile profile;
+  final bool accepted;
+}
+
 class ContactsFailure implements Exception {
   const ContactsFailure(this.message);
 

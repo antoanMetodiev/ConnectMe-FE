@@ -1,86 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../shared/widgets/app_avatar.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/conversation_tile.dart';
+import '../../chat/application/chat_controller.dart';
+import '../../chat/domain/chat_models.dart';
 
-class _Conversation {
-  const _Conversation({
-    required this.initials,
-    required this.name,
-    required this.lastMessage,
-    required this.time,
-    this.presence = PresenceStatus.offline,
-    this.unreadCount = 0,
-  });
-
-  final String initials;
-  final String name;
-  final String lastMessage;
-  final String time;
-  final PresenceStatus presence;
-  final int unreadCount;
+String _formatTime(DateTime time) {
+  final local = time.toLocal();
+  final now = DateTime.now();
+  final isToday =
+      local.year == now.year && local.month == now.month && local.day == now.day;
+  if (isToday) {
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+  final dd = local.day.toString().padLeft(2, '0');
+  final mo = local.month.toString().padLeft(2, '0');
+  return '$dd.$mo';
 }
 
-// Placeholder data — replaced once conversations come from Supabase.
-const _conversations = [
-  _Conversation(
-    initials: 'М',
-    name: 'Мария',
-    lastMessage: 'Готино, чакам те!',
-    time: '14:03',
-    presence: PresenceStatus.online,
-    unreadCount: 2,
-  ),
-  _Conversation(
-    initials: 'И',
-    name: 'Иван',
-    lastMessage: 'Пращам ти утре сутринта',
-    time: '12:47',
-  ),
-  _Conversation(
-    initials: 'Г',
-    name: 'Familia',
-    lastMessage: 'Тати: Стигнахме добре',
-    time: 'вчера',
-    unreadCount: 5,
-  ),
-  _Conversation(
-    initials: 'Е',
-    name: 'Елена',
-    lastMessage: 'Виж снимката 📷',
-    time: 'вчера',
-    presence: PresenceStatus.online,
-  ),
-  _Conversation(
-    initials: 'Н',
-    name: 'Никола',
-    lastMessage: 'Благодаря!',
-    time: 'понеделник',
-  ),
-];
-
-class ChatsTab extends StatelessWidget {
+class ChatsTab extends ConsumerWidget {
   const ChatsTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: _conversations.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final c = _conversations[index];
-        return ConversationTile(
-          initials: c.initials,
-          name: c.name,
-          lastMessage: c.lastMessage,
-          time: c.time,
-          presence: c.presence,
-          unreadCount: c.unreadCount,
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Отваряне на чат — скоро.')),
-          ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final chatsAsync = ref.watch(chatListProvider);
+
+    return chatsAsync.when(
+      data: (chats) {
+        if (chats.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.xxl),
+              child: Text(
+                'Все още нямаш чатове. Отвори "Контакти" и започни разговор.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+        return ListView.separated(
+          itemCount: chats.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (context, index) {
+            final chat = chats[index];
+            return ConversationTile(
+              initials: chat.otherUser.initials,
+              name: chat.otherUser.name,
+              lastMessage: chat.lastMessageBody != null
+                  ? CallLogMessage.display(chat.lastMessageBody!)
+                  : 'Все още няма съобщения.',
+              time: chat.lastMessageAt != null
+                  ? _formatTime(chat.lastMessageAt!)
+                  : '',
+              onTap: () => context.push(
+                '/chat/${chat.id}',
+                extra: chat.otherUser,
+              ),
+            );
+          },
         );
       },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xxl),
+          child: Text(
+            '$error',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
