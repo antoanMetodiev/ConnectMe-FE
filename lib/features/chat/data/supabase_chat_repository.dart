@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
+import 'package:uuid/uuid.dart';
 
 import '../../contacts/domain/contact_models.dart';
 import '../domain/chat_models.dart';
 import '../domain/chat_repository.dart';
+
+const _ephemeralPhotosBucket = 'ephemeral-photos';
+const _voiceMessagesBucket = 'voice-messages';
 
 class SupabaseChatRepository implements ChatRepository {
   SupabaseChatRepository(this._client);
@@ -55,6 +60,7 @@ class SupabaseChatRepository implements ChatRepository {
             id: chatId,
             otherUser: otherUser,
             lastMessageBody: lastMessage?['body'] as String?,
+            lastMessageSenderId: lastMessage?['sender_id'] as String?,
             lastMessageAt: lastMessage != null
                 ? DateTime.parse(lastMessage['created_at'] as String)
                 : DateTime.parse(row['created_at'] as String),
@@ -232,6 +238,108 @@ class SupabaseChatRepository implements ChatRepository {
         });
   }
 
+  @override
+  Future<void> sendPhoto({
+    required String chatId,
+    required Uint8List bytes,
+  }) async {
+    final path = '$chatId/${const Uuid().v4()}.jpg';
+    try {
+      await _client.storage
+          .from(_ephemeralPhotosBucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const supabase.FileOptions(
+              contentType: 'image/jpeg',
+            ),
+          );
+      await _client.from('messages').insert({
+        'chat_id': chatId,
+        'sender_id': _myId,
+        'body': PhotoMessage.encode(path),
+      });
+    } on supabase.StorageException catch (e) {
+      throw ChatFailure(e.message);
+    } on supabase.PostgrestException catch (e) {
+      throw ChatFailure(e.message);
+    }
+  }
+
+  @override
+  Future<Uint8List> openPhoto({
+    required String messageId,
+    required String storagePath,
+  }) async {
+    final Uint8List bytes;
+    try {
+      bytes = await _client.storage
+          .from(_ephemeralPhotosBucket)
+          .download(storagePath);
+    } on supabase.StorageException catch (e) {
+      throw ChatFailure(e.message);
+    }
+
+    // Best-effort cleanup — the viewer already has the bytes, so a hiccup
+    // here shouldn't stop them from seeing the photo. Worst case it can be
+    // reopened once, or the file lingers until a manual cleanup.
+    try {
+      await _client
+          .from('messages')
+          .update({'body': PhotoMessage.viewed()})
+          .eq('id', messageId);
+    } catch (_) {
+      // Ignored — see comment above.
+    }
+    try {
+      await _client.storage.from(_ephemeralPhotosBucket).remove([
+        storagePath,
+      ]);
+    } catch (_) {
+      // Ignored — see comment above.
+    }
+
+    return bytes;
+  }
+
+  @override
+  Future<void> sendVoice({
+    required String chatId,
+    required Uint8List bytes,
+    required Duration duration,
+  }) async {
+    final path = '$chatId/${const Uuid().v4()}.m4a';
+    try {
+      await _client.storage
+          .from(_voiceMessagesBucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const supabase.FileOptions(contentType: 'audio/mp4'),
+          );
+      await _client.from('messages').insert({
+        'chat_id': chatId,
+        'sender_id': _myId,
+        'body': VoiceMessage.encode(path, duration),
+      });
+    } on supabase.StorageException catch (e) {
+      throw ChatFailure(e.message);
+    } on supabase.PostgrestException catch (e) {
+      throw ChatFailure(e.message);
+    }
+  }
+
+  @override
+  Future<String> voicePlaybackUrl(String storagePath) async {
+    try {
+      return await _client.storage
+          .from(_voiceMessagesBucket)
+          .createSignedUrl(storagePath, 60 * 60);
+    } on supabase.StorageException catch (e) {
+      throw ChatFailure(e.message);
+    }
+  }
+
   Future<Map<String, UserProfile>> _profilesById(List<String> ids) async {
     if (ids.isEmpty) return {};
     final rows = await _client
@@ -244,6 +352,7 @@ class SupabaseChatRepository implements ChatRepository {
           id: row['id'] as String,
           email: row['email'] as String,
           displayName: row['display_name'] as String?,
+          avatarUrl: row['avatar_url'] as String?,
         ),
     };
   }

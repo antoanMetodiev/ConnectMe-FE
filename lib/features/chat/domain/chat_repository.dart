@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'chat_models.dart';
 
 abstract class ChatRepository {
@@ -36,4 +38,25 @@ abstract class ChatRepository {
     required String chatId,
     required String otherUserId,
   });
+
+  /// Uploads a view-once photo and sends it as a message.
+  Future<void> sendPhoto({required String chatId, required Uint8List bytes});
+
+  /// Downloads a photo message's image, then marks it viewed and deletes
+  /// the underlying file — it can't be opened a second time by anyone.
+  Future<Uint8List> openPhoto({
+    required String messageId,
+    required String storagePath,
+  });
+
+  /// Uploads a voice message and sends it. Kept permanently — unlike
+  /// photos, there's no view-once deletion.
+  Future<void> sendVoice({
+    required String chatId,
+    required Uint8List bytes,
+    required Duration duration,
+  });
+
+  /// A short-lived signed URL to stream/play a voice message from.
+  Future<String> voicePlaybackUrl(String storagePath);
 }

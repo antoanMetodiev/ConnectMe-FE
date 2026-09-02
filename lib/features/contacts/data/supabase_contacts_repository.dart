@@ -30,6 +30,7 @@ class SupabaseContactsRepository implements ContactsRepository {
             id: row['id'] as String,
             email: row['email'] as String,
             displayName: row['display_name'] as String?,
+            avatarUrl: row['avatar_url'] as String?,
           ),
         )
         .toList();
@@ -174,8 +175,33 @@ class SupabaseContactsRepository implements ContactsRepository {
           id: row['id'] as String,
           email: row['email'] as String,
           displayName: row['display_name'] as String?,
+          avatarUrl: row['avatar_url'] as String?,
         ),
     };
+  }
+
+  @override
+  Future<List<UserProfile>> searchAnyUser(String query) async {
+    final sanitized = query.replaceAll(RegExp(r'[,()]'), '').trim();
+    if (sanitized.isEmpty) return [];
+
+    final rows = await _client
+        .from('profiles')
+        .select()
+        .neq('id', _myId)
+        .or('display_name.ilike.%$sanitized%,email.ilike.%$sanitized%')
+        .limit(20);
+
+    return rows
+        .map(
+          (row) => UserProfile(
+            id: row['id'] as String,
+            email: row['email'] as String,
+            displayName: row['display_name'] as String?,
+            avatarUrl: row['avatar_url'] as String?,
+          ),
+        )
+        .toList();
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
@@ -78,6 +79,20 @@ class AuthController extends AsyncNotifier<AuthUser?> {
     } catch (e, stackTrace) {
       state = AsyncError(e, stackTrace);
     }
+  }
+
+  Future<void> updateProfile({String? displayName, String? avatarUrl}) {
+    return _run(
+      () => ref
+          .read(authRepositoryProvider)
+          .updateProfile(displayName: displayName, avatarUrl: avatarUrl),
+    );
+  }
+
+  /// Just the upload — doesn't touch [state]. Caller follows up with
+  /// [updateProfile] once it has the resulting URL.
+  Future<String> uploadAvatar(Uint8List bytes) {
+    return ref.read(authRepositoryProvider).uploadAvatar(bytes);
   }
 
   Future<void> signOut() async {

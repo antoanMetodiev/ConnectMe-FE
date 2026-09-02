@@ -1,6 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:record/record.dart';
 
+import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/app_avatar.dart';
 import '../../../shared/widgets/message_bubble.dart';
@@ -11,6 +17,8 @@ import '../../calls/presentation/call_screen.dart';
 import '../../contacts/domain/contact_models.dart';
 import '../application/chat_controller.dart';
 import '../domain/chat_models.dart';
+import 'photo_viewer_screen.dart';
+import 'voice_message_bubble.dart';
 
 String _formatTime(DateTime time) {
   final local = time.toLocal();
@@ -45,6 +53,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _sending = false;
   bool _scrolledOnce = false;
   DateTime? _lastTypingSentAt;
+
+  AudioRecorder? _recorder;
+  bool _recording = false;
+  Duration _recordElapsed = Duration.zero;
+  Timer? _recordTimer;
 
   void _scrollToBottom({required bool animate}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -84,6 +97,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _controller.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _recordTimer?.cancel();
+    _recorder?.dispose();
     super.dispose();
   }
 
@@ -139,19 +154,161 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Future<void> _startRecording() async {
+    final recorder = AudioRecorder();
+    if (!await recorder.hasPermission()) {
+      await recorder.dispose();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Няма достъп до микрофона.')),
+        );
+      }
+      return;
+    }
+    // Voice-note-appropriate settings — mono, 16kHz, 32kbps keeps a 30s
+    // clip to roughly 100-150KB instead of megabytes.
+    await recorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 32000,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: 'voice-message.m4a',
+    );
+    _recorder = recorder;
+    setState(() {
+      _recording = true;
+      _recordElapsed = Duration.zero;
+    });
+    _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _recordElapsed += const Duration(seconds: 1));
+      }
+    });
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordTimer?.cancel();
+    final recorder = _recorder;
+    _recorder = null;
+    if (recorder != null) {
+      await recorder.cancel();
+      await recorder.dispose();
+    }
+    if (mounted) setState(() => _recording = false);
+  }
+
+  Future<void> _stopRecordingAndSend() async {
+    _recordTimer?.cancel();
+    final recorder = _recorder;
+    _recorder = null;
+    if (recorder == null) return;
+
+    final blobUrl = await recorder.stop();
+    final duration = _recordElapsed;
+    await recorder.dispose();
+    if (mounted) setState(() => _recording = false);
+
+    // Ignore accidental taps that end before anything meaningful was
+    // captured.
+    if (blobUrl == null || duration.inSeconds < 1) return;
+
+    try {
+      // record's web implementation hands back a blob: URL rather than
+      // bytes directly — fetching it is how those get read.
+      final response = await http.get(Uri.parse(blobUrl));
+      await ref
+          .read(chatRepositoryProvider)
+          .sendVoice(
+            chatId: widget.chatId,
+            bytes: response.bodyBytes,
+            duration: duration,
+          );
+      if (mounted) _scrollToBottom(animate: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _pickAndSendPhoto() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Камера'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Галерия'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1600,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+      return;
+    }
+    if (picked == null) return;
+
+    try {
+      final bytes = await picked.readAsBytes();
+      await ref
+          .read(chatRepositoryProvider)
+          .sendPhoto(chatId: widget.chatId, bytes: bytes);
+      if (mounted) _scrollToBottom(animate: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
   Future<void> _startCall({required bool video}) async {
     try {
       final call = await ref
           .read(callActionsProvider)
-          .startCall(
-            chatId: widget.chatId,
-            otherUserId: widget.otherUser.id,
-            video: video,
-          );
+          .startCall(otherUserId: widget.otherUser.id, video: video);
       if (mounted) {
-        await Navigator.of(
-          context,
-        ).push(MaterialPageRoute(builder: (_) => CallScreen(call: call)));
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CallScreen(
+              call: call,
+              outgoingCallLog: OutgoingCallLog(
+                video: video,
+                writeMessage: (body) => ref
+                    .read(chatRepositoryProvider)
+                    .sendMessage(chatId: widget.chatId, body: body),
+              ),
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -198,7 +355,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            AppAvatar(initials: widget.otherUser.initials, size: 36),
+            AppAvatar(
+              initials: widget.otherUser.initials,
+              imageUrl: widget.otherUser.avatarUrl,
+              size: 36,
+            ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -296,7 +457,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
-                              '${CallLogMessage.display(message.body)} · '
+                              '${CallLogMessage.display(
+                                message.body,
+                                startedByMe: message.senderId == myId,
+                                otherName: widget.otherUser.name,
+                              )} · '
                               '${_formatTime(message.createdAt)}',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
@@ -306,8 +471,61 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                       );
                     }
+                    if (PhotoMessage.isPhoto(message.body)) {
+                      final isMine = message.senderId == myId;
+                      final viewed = PhotoMessage.isViewed(message.body);
+                      final storagePath = PhotoMessage.storagePath(
+                        message.body,
+                      );
+                      return Padding(
+                        padding: EdgeInsets.only(
+                          top: topSpacing,
+                          bottom: AppSpacing.xs,
+                        ),
+                        child: _PhotoBubble(
+                          isMine: isMine,
+                          viewed: viewed,
+                          // Only the recipient can open it — the sender
+                          // never gets a second look either.
+                          canOpen: !isMine && storagePath != null,
+                          onTap: storagePath == null
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => PhotoViewerScreen(
+                                      messageId: message.id,
+                                      storagePath: storagePath,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      );
+                    }
+                    if (VoiceMessage.isVoice(message.body)) {
+                      final storagePath = VoiceMessage.storagePath(
+                        message.body,
+                      );
+                      if (storagePath != null) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            top: topSpacing,
+                            bottom: AppSpacing.xs,
+                          ),
+                          child: VoiceMessageBubble(
+                            isMine: message.senderId == myId,
+                            storagePath: storagePath,
+                            duration: VoiceMessage.duration(message.body),
+                          ),
+                        );
+                      }
+                    }
+                    final storyReplyText = StoryReplyMessage.display(
+                      message.body,
+                      startedByMe: message.senderId == myId,
+                      otherName: widget.otherUser.name,
+                    );
                     final bubble = MessageBubble(
-                      text: message.body,
+                      text: storyReplyText ?? message.body,
                       time: _formatTime(message.createdAt),
                       isMine: message.senderId == myId,
                     );
@@ -363,8 +581,142 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
           ),
-          MessageInputBar(controller: _controller, onSend: _send),
+          if (_recording)
+            _RecordingBar(
+              elapsed: _recordElapsed,
+              onCancel: _cancelRecording,
+              onStop: _stopRecordingAndSend,
+            )
+          else
+            MessageInputBar(
+              controller: _controller,
+              onSend: _send,
+              onAttach: _pickAndSendPhoto,
+              onRecord: _startRecording,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// A view-once photo message. Tapping it (when [canOpen]) is what actually
+/// downloads and consumes it — this widget never shows the image itself.
+class _PhotoBubble extends StatelessWidget {
+  const _PhotoBubble({
+    required this.isMine,
+    required this.viewed,
+    required this.canOpen,
+    this.onTap,
+  });
+
+  final bool isMine;
+  final bool viewed;
+  final bool canOpen;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final enabled = canOpen && !viewed;
+    final label = viewed
+        ? 'Снимката е отворена'
+        : (canOpen ? 'Снимка — докосни, за да отвориш' : 'Изпратена снимка');
+    final foreground = isMine
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Material(
+        color: isMine
+            ? theme.colorScheme.primary.withValues(alpha: viewed ? 0.5 : 1)
+            : theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  viewed ? Icons.image_outlined : Icons.camera_alt,
+                  size: 18,
+                  color: foreground,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  label,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: foreground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Replaces [MessageInputBar] while a voice message is being recorded.
+class _RecordingBar extends StatelessWidget {
+  const _RecordingBar({
+    required this.elapsed,
+    required this.onCancel,
+    required this.onStop,
+  });
+
+  final Duration elapsed;
+  final VoidCallback onCancel;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final mm = elapsed.inMinutes.toString().padLeft(2, '0');
+    final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: onCancel,
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Отказ',
+            ),
+            Icon(
+              Icons.fiber_manual_record,
+              color: theme.colorScheme.error,
+              size: 14,
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Text('$mm:$ss', style: theme.textTheme.bodyMedium),
+            const Spacer(),
+            IconButton(
+              onPressed: onStop,
+              icon: const Icon(Icons.send_rounded),
+              color: theme.colorScheme.primary,
+              tooltip: 'Изпрати',
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -3,6 +3,11 @@ import 'contact_models.dart';
 abstract class ContactsRepository {
   Future<List<ContactSearchResult>> searchUsers(String query);
 
+  /// Any registered user matching [query] by name/email — unlike
+  /// [searchUsers], not scoped to contacts. Used for picking group-call
+  /// participants, who don't have to be contacts.
+  Future<List<UserProfile>> searchAnyUser(String query);
+
   /// Pending contact requests sent *to* the current user.
   Future<List<ContactSearchResult>> incomingRequests();
 

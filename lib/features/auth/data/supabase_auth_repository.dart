@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 import '../domain/auth_models.dart';
 import '../domain/auth_repository.dart';
+
+const _avatarsBucket = 'avatars';
 
 class SupabaseAuthRepository implements AuthRepository {
   SupabaseAuthRepository(this._client);
@@ -99,6 +103,63 @@ class SupabaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthUser> updateProfile({
+    String? displayName,
+    String? avatarUrl,
+  }) async {
+    try {
+      final response = await _client.auth.updateUser(
+        supabase.UserAttributes(
+          data: {
+            'display_name': ?displayName,
+            'avatar_url': ?avatarUrl,
+          },
+        ),
+      );
+      final user = response.user;
+      if (user == null) {
+        throw const AuthFailure('Неуспешно запазване. Опитай пак.');
+      }
+      return _toAuthUser(user)!;
+    } on supabase.AuthException catch (e) {
+      throw AuthFailure(_friendlyMessage(e));
+    }
+  }
+
+  @override
+  Future<String> uploadAvatar(Uint8List bytes) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const AuthFailure('Трябва да си влязъл, за да смениш снимката.');
+    }
+    final path = '$userId/avatar.jpg';
+    try {
+      // Remove-then-insert rather than upsert: true — simpler to reason
+      // about under RLS, and a missing prior file is a harmless no-op.
+      try {
+        await _client.storage.from(_avatarsBucket).remove([path]);
+      } catch (_) {
+        // Nothing to remove on the first-ever upload — fine.
+      }
+      await _client.storage
+          .from(_avatarsBucket)
+          .uploadBinary(
+            path,
+            bytes,
+            fileOptions: const supabase.FileOptions(
+              contentType: 'image/jpeg',
+            ),
+          );
+      // Cache-bust — the path never changes, so without this the browser
+      // (and any CDN in front of Storage) would keep showing the old image.
+      final publicUrl = _client.storage.from(_avatarsBucket).getPublicUrl(path);
+      return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    } on supabase.StorageException catch (e) {
+      throw AuthFailure(e.message);
+    }
+  }
+
+  @override
   Future<void> signOut() => _client.auth.signOut();
 
   AuthUser? _toAuthUser(supabase.User? user) {
@@ -107,6 +168,11 @@ class SupabaseAuthRepository implements AuthRepository {
       id: user.id,
       email: user.email!,
       displayName: user.userMetadata?['display_name'] as String?,
+      avatarUrl:
+          (user.userMetadata?['avatar_url'] ??
+                  user.userMetadata?['picture'])
+              as String?,
+      createdAt: DateTime.tryParse(user.createdAt),
       profileCompleted: user.userMetadata?['profile_completed'] == true,
     );
   }

@@ -7,10 +7,20 @@ class MessageInputBar extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onSend,
+    this.onAttach,
+    this.onRecord,
   });
 
   final TextEditingController controller;
   final VoidCallback onSend;
+
+  /// Shows a leading attachment button when provided; omitted entirely
+  /// otherwise, so existing call sites are unaffected.
+  final VoidCallback? onAttach;
+
+  /// Shows a leading mic button when provided, to start recording a voice
+  /// message.
+  final VoidCallback? onRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -29,6 +39,22 @@ class MessageInputBar extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (onAttach != null) ...[
+              IconButton(
+                onPressed: onAttach,
+                icon: const Icon(Icons.camera_alt_outlined),
+                tooltip: 'Изпрати снимка (отваря се веднъж)',
+              ),
+              const SizedBox(width: AppSpacing.xs),
+            ],
+            if (onRecord != null) ...[
+              IconButton(
+                onPressed: onRecord,
+                icon: const Icon(Icons.mic_none_outlined),
+                tooltip: 'Гласово съобщение',
+              ),
+              const SizedBox(width: AppSpacing.xs),
+            ],
             Expanded(
               child: TextField(
                 controller: controller,

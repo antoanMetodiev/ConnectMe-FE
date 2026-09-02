@@ -7,8 +7,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/config/env.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../chat/application/chat_controller.dart';
-import '../../chat/domain/chat_models.dart';
 
 /// Connects the Stream Video client for the signed-in user and keeps it
 /// alive for the app session — reconnects on sign-in, disconnects on
@@ -67,8 +65,24 @@ class CallActions {
   final Ref _ref;
 
   Future<stream.Call> startCall({
-    required String chatId,
     required String otherUserId,
+    required bool video,
+  }) {
+    return _startCall(memberIds: [otherUserId], video: video);
+  }
+
+  /// Starts a conference call — any registered user can be added, not just
+  /// existing contacts, since a call's members are independent of the
+  /// contacts/friends system.
+  Future<stream.Call> startGroupCall({
+    required List<String> memberIds,
+    required bool video,
+  }) {
+    return _startCall(memberIds: memberIds, video: video);
+  }
+
+  Future<stream.Call> _startCall({
+    required List<String> memberIds,
     required bool video,
   }) async {
     final client = await _ref.read(streamVideoConnectionProvider.future);
@@ -81,21 +95,10 @@ class CallActions {
       id: const Uuid().v4(),
     );
     await call.getOrCreate(
-      memberIds: [myId, otherUserId],
+      memberIds: [myId, ...memberIds],
       video: video,
       ringing: true,
     );
-
-    // Best-effort — a failed log entry shouldn't block the call itself.
-    unawaited(
-      _ref
-          .read(chatRepositoryProvider)
-          .sendMessage(
-            chatId: chatId,
-            body: video ? CallLogMessage.video() : CallLogMessage.audio(),
-          ),
-    );
-
     return call;
   }
 }

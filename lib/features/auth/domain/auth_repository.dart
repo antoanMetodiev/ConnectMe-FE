@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'auth_models.dart';
 
 abstract class AuthRepository {
@@ -22,6 +24,14 @@ abstract class AuthRepository {
   Future<void> signInWithGoogle();
 
   Future<AuthUser> completeProfileSetup({required String displayName});
+
+  /// Updates the caller's own name and/or avatar. Pass only what changed —
+  /// omitted fields are left as they are.
+  Future<AuthUser> updateProfile({String? displayName, String? avatarUrl});
+
+  /// Uploads a new avatar image and returns its public URL. Doesn't update
+  /// the profile itself — pass the result to [updateProfile].
+  Future<String> uploadAvatar(Uint8List bytes);
 
   Future<void> signOut();
 }

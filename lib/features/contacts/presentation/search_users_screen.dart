@@ -97,7 +97,10 @@ class _SearchUsersScreenState extends ConsumerState<SearchUsersScreen> {
                   horizontal: AppSpacing.lg,
                   vertical: AppSpacing.xs,
                 ),
-                leading: AppAvatar(initials: r.profile.initials),
+                leading: AppAvatar(
+                  initials: r.profile.initials,
+                  imageUrl: r.profile.avatarUrl,
+                ),
                 title: Text(r.profile.name),
                 subtitle: Text(r.profile.email),
                 trailing: _Action(

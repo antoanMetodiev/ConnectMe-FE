@@ -5,11 +5,13 @@ class UserProfile {
     required this.id,
     required this.email,
     this.displayName,
+    this.avatarUrl,
   });
 
   final String id;
   final String email;
   final String? displayName;
+  final String? avatarUrl;
 
   String get name => (displayName?.isNotEmpty ?? false) ? displayName! : email;
   String get initials => name.isNotEmpty ? name[0].toUpperCase() : '?';

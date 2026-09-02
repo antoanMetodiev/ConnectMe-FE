@@ -9,9 +9,13 @@ import '../../features/contacts/presentation/contact_activity_screen.dart';
 import '../../features/contacts/presentation/incoming_requests_screen.dart';
 import '../../features/contacts/presentation/search_users_screen.dart';
 import '../../features/dev/component_gallery_screen.dart';
+import '../../features/groups/presentation/group_chat_screen.dart';
+import '../../features/groups/presentation/new_group_screen.dart';
 import '../../features/home/presentation/home_shell.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/splash/presentation/splash_screen.dart';
+import '../../features/stories/domain/story_models.dart';
+import '../../features/stories/presentation/story_viewer_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -49,6 +53,25 @@ final appRouter = GoRouter(
         chatId: state.pathParameters['chatId']!,
         otherUser: state.extra as UserProfile,
       ),
+    ),
+    GoRoute(
+      path: '/groups/new',
+      builder: (context, state) => const NewGroupScreen(),
+    ),
+    GoRoute(
+      path: '/group/:groupId',
+      builder: (context, state) =>
+          GroupChatScreen(groupId: state.pathParameters['groupId']!),
+    ),
+    GoRoute(
+      path: '/stories/view',
+      builder: (context, state) {
+        final extra = state.extra as ({List<StoryGroup> groups, int startIndex});
+        return StoryViewerScreen(
+          groups: extra.groups,
+          startIndex: extra.startIndex,
+        );
+      },
     ),
     GoRoute(
       path: '/dev/components',

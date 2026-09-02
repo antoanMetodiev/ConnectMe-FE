@@ -71,7 +71,10 @@ class _ContactsTabState extends ConsumerState<ContactsTab> {
                 horizontal: AppSpacing.lg,
                 vertical: AppSpacing.xs,
               ),
-              leading: AppAvatar(initials: contact.initials),
+              leading: AppAvatar(
+                initials: contact.initials,
+                imageUrl: contact.avatarUrl,
+              ),
               title: Text(contact.name),
               subtitle: Text(contact.email),
               trailing: isOpening

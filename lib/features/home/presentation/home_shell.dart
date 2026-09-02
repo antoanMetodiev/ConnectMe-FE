@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../calls/application/call_controller.dart';
 import '../../calls/presentation/call_screen.dart';
 import '../../contacts/application/contacts_controller.dart';
-import 'calls_tab.dart';
 import 'chats_tab.dart';
 import 'contacts_tab.dart';
+import 'groups_tab.dart';
 import 'profile_tab.dart';
 import 'stories_tab.dart';
 
@@ -27,7 +27,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     'ConnectMe',
     'Контакти',
     'Истории',
-    'Обаждания',
+    'Групи',
     'Профил',
   ];
 
@@ -35,7 +35,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     ChatsTab(),
     ContactsTab(),
     StoriesTab(),
-    CallsTab(),
+    GroupsTab(),
     ProfileTab(),
   ];
 
@@ -79,11 +79,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
                   ),
                   tooltip: 'Входящи покани',
                 ),
+              ]
+            : _index == 3
+            ? [
                 IconButton(
-                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Търсене — скоро.')),
-                  ),
-                  icon: const Icon(Icons.search),
+                  onPressed: () => context.push('/groups/new'),
+                  icon: const Icon(Icons.group_add_outlined),
+                  tooltip: 'Нова група',
                 ),
               ]
             : null,
@@ -115,9 +117,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             label: 'Истории',
           ),
           NavigationDestination(
-            icon: Icon(Icons.call_outlined),
-            selectedIcon: Icon(Icons.call),
-            label: 'Обаждания',
+            icon: Icon(Icons.groups_outlined),
+            selectedIcon: Icon(Icons.groups),
+            label: 'Групи',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

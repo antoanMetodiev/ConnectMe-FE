@@ -58,7 +58,10 @@ class _ContactActivityScreenState
                   horizontal: AppSpacing.lg,
                   vertical: AppSpacing.xs,
                 ),
-                leading: AppAvatar(initials: a.profile.initials),
+                leading: AppAvatar(
+                  initials: a.profile.initials,
+                  imageUrl: a.profile.avatarUrl,
+                ),
                 title: Text(a.profile.name),
                 subtitle: Text(
                   a.accepted

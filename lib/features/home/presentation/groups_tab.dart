@@ -5,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../shared/widgets/conversation_tile.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../chat/application/chat_controller.dart';
 import '../../chat/domain/chat_models.dart';
+import '../../groups/application/groups_controller.dart';
 
 String _formatTime(DateTime time) {
   final local = time.toLocal();
@@ -23,11 +23,7 @@ String _formatTime(DateTime time) {
   return '$dd.$mo';
 }
 
-String _previewText(
-  String body, {
-  required bool startedByMe,
-  required String otherName,
-}) {
+String _previewText(String body, {required bool startedByMe}) {
   if (PhotoMessage.isPhoto(body)) {
     return PhotoMessage.isViewed(body) ? '📷 Снимка (отворена)' : '📷 Снимка';
   }
@@ -37,43 +33,37 @@ String _previewText(
     final ss = (total % 60).toString().padLeft(2, '0');
     return '🎤 Гласово съобщение · $mm:$ss';
   }
-  final storyReply = StoryReplyMessage.display(
-    body,
-    startedByMe: startedByMe,
-    otherName: otherName,
-  );
-  if (storyReply != null) return storyReply.replaceFirst('\n', ': ');
   return CallLogMessage.display(
     body,
     startedByMe: startedByMe,
-    otherName: otherName,
+    otherName: 'Някой',
   );
 }
 
-class ChatsTab extends ConsumerWidget {
-  const ChatsTab({super.key});
+class GroupsTab extends ConsumerWidget {
+  const GroupsTab({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final chatsAsync = ref.watch(chatListProvider);
+    final groupsAsync = ref.watch(groupListProvider);
     final myId = ref.watch(authControllerProvider).value?.id;
 
-    if (chatsAsync.hasError) {
-      return _ErrorState(error: chatsAsync.error!);
+    if (groupsAsync.hasError) {
+      return _ErrorState(error: groupsAsync.error!);
     }
-    if (!chatsAsync.hasValue) {
+    if (!groupsAsync.hasValue) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final chats = chatsAsync.value!;
+    final groups = groupsAsync.value!;
 
-    if (chats.isEmpty) {
+    if (groups.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.xxl),
           child: Text(
-            'Все още нямаш чатове. Отвори "Контакти" и започни разговор.',
+            'Все още нямаш групи. Натисни бутона горе, за да създадеш нова.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -84,26 +74,23 @@ class ChatsTab extends ConsumerWidget {
     }
 
     return ListView.separated(
-      itemCount: chats.length,
+      itemCount: groups.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) {
-        final chat = chats[index];
+        final group = groups[index];
         return ConversationTile(
-          initials: chat.otherUser.initials,
-          imageUrl: chat.otherUser.avatarUrl,
-          name: chat.otherUser.name,
-          lastMessage: chat.lastMessageBody != null
+          initials: group.initials,
+          name: group.name,
+          lastMessage: group.lastMessageBody != null
               ? _previewText(
-                  chat.lastMessageBody!,
-                  startedByMe: chat.lastMessageSenderId == myId,
-                  otherName: chat.otherUser.name,
+                  group.lastMessageBody!,
+                  startedByMe: group.lastMessageSenderId == myId,
                 )
-              : 'Все още няма съобщения.',
-          time: chat.lastMessageAt != null
-              ? _formatTime(chat.lastMessageAt!)
+              : '${group.memberIds.length} членове',
+          time: group.lastMessageAt != null
+              ? _formatTime(group.lastMessageAt!)
               : '',
-          onTap: () =>
-              context.push('/chat/${chat.id}', extra: chat.otherUser),
+          onTap: () => context.push('/group/${group.id}'),
         );
       },
     );

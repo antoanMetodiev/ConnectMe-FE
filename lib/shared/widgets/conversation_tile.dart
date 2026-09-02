@@ -10,12 +10,14 @@ class ConversationTile extends StatelessWidget {
     required this.name,
     required this.lastMessage,
     required this.time,
+    this.imageUrl,
     this.presence = PresenceStatus.none,
     this.unreadCount = 0,
     this.onTap,
   });
 
   final String initials;
+  final String? imageUrl;
   final String name;
   final String lastMessage;
   final String time;
@@ -37,7 +39,12 @@ class ConversationTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            AppAvatar(initials: initials, presence: presence, size: 48),
+            AppAvatar(
+              initials: initials,
+              imageUrl: imageUrl,
+              presence: presence,
+              size: 48,
+            ),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(

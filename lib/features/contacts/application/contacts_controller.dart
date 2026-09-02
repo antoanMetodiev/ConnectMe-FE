@@ -90,6 +90,29 @@ final acceptedContactsProvider = FutureProvider<List<UserProfile>>((ref) {
   return ref.read(contactsRepositoryProvider).acceptedContacts();
 });
 
+/// Searches every registered user (not just contacts) — used to pick
+/// participants for a group call.
+class AnyUserSearchController extends AsyncNotifier<List<UserProfile>> {
+  @override
+  FutureOr<List<UserProfile>> build() => [];
+
+  Future<void> search(String query) async {
+    if (query.trim().isEmpty) {
+      state = const AsyncData([]);
+      return;
+    }
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(
+      () => ref.read(contactsRepositoryProvider).searchAnyUser(query),
+    );
+  }
+}
+
+final anyUserSearchControllerProvider =
+    AsyncNotifierProvider<AnyUserSearchController, List<UserProfile>>(
+      AnyUserSearchController.new,
+    );
+
 class ContactActivityController extends AsyncNotifier<List<ContactActivity>> {
   @override
   FutureOr<List<ContactActivity>> build() async {
